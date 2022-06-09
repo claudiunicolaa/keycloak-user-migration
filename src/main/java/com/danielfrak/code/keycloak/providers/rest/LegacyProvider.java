@@ -10,6 +10,7 @@ import org.keycloak.credential.CredentialInputUpdater;
 import org.keycloak.credential.CredentialInputValidator;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
+import org.keycloak.models.UserCredentialModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.credential.PasswordCredentialModel;
 import org.keycloak.storage.UserStorageProvider;
@@ -70,7 +71,16 @@ public class LegacyProvider implements UserStorageProvider,
 
         var userIdentifier = getUserIdentifier(userModel);
         if (legacyUserService.isPasswordValid(userIdentifier, input.getChallengeResponse())) {
-            session.userCredentialManager().updateCredential(realmModel, userModel, input);
+            // @see: https://github.com/daniel-frak/keycloak-user-migration/issues/32#issuecomment-1150905883
+            if (userModel.getRequiredActionsStream().anyMatch(s -> s.contains("UPDATE_PASSWORD"))) {
+                session.userCredentialManager().updateCredential(
+                        realmModel,
+                        userModel,
+                        UserCredentialModel.password(java.util.UUID.randomUUID() + "1aA!")
+                );
+            } else {
+                session.userCredentialManager().updateCredential(realmModel, userModel, input);
+            }
             return true;
         }
 
